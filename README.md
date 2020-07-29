@@ -2,8 +2,8 @@
 
 
 
-
-´´´ python
+## Example
+```python
 from sklearn.datasets import load_boston
 from skopt.space import Real, Integer
 # Classifiers
@@ -28,4 +28,4 @@ space_gpdt = [Integer(1, 20, name='max_depth'),
 ncalls = 100
 params = hyper_parameter_tuning(model=reg_cls_gpdt, space=space_gpdt,
                                 X=X, y=y, ncalls = ncalls, mtype = 'res')
-´´´
+```
