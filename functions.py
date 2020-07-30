@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 import numpy as np
 
-
+from skopt.space import Real, Integer
 from skopt.utils import use_named_args
 from skopt import gp_minimize, Optimizer
 
@@ -17,8 +17,8 @@ from sklearn.model_selection import cross_val_score
 #%%
 class hyper_parameter_tuning():
     
-    def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res'):
-        self.X, self.y = X, y
+    def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res', niter = 1):
+        self.X, self.y, self.niter = X, y, niter
         self.model, self.space = model, space
         self.ncalls, self.mtype = ncalls, mtype
     
@@ -32,6 +32,61 @@ class hyper_parameter_tuning():
         self.model.set_params(**param)
         score = self.objetive(self.model)
         return score
+    
+    def parallelizing(self, args, params):
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            result = executor.map(self.setting_parameters, args)
+            results = []
+            parameter = []
+            # print(f'Time it took: {time.time()-start}s')
+        for r, param in tqdm(zip(result, params)):
+            results.append(r)
+            parameter.append(param)
+        return parameter, results
+
+    def create_args(self):
+        opt = Optimizer(self.space)
+        self.param_names = [i.name for i in self.space]            
+        params = [opt.ask() for _ in range(self.ncalls)]
+        args = ((self.model, self.param_names, b) for b in params)
+        return args, params
+    
+    def higher_quartile(self, parameter, results):
+        if self.mtype == 'res':
+            mask = results < np.percentile(results, 10)
+        else: 
+            mask = results > np.percentile(results, 90)
+
+        parameter = np.array(parameter)
+        parameter_low_top = []
+        for i in range(len(self.param_names)):
+            parameter_low_top.append([np.min(parameter[mask][:,i]), np.max(parameter[mask][:,i])])
+        space = []        
+        for i, j, values in zip(self.space, self.param_names, parameter_low_top):
+            if i.dtype == np.int64:
+                if values[0]==values[1]:
+                    values = [values[0], values[1]+1]
+                space.append(Integer(values[0], values[1], name=j))
+            elif i.dtype == float:
+                if values[0]==values[1]:
+                    values = [values[0], values[1]+values[1]/100]
+                space.append(Real(values[0], values[1], name=j))
+        self.space = space
+        args, params = self.create_args()
+        return args, params
+    
+    def best_result(self, parameter, results):
+        if self.mtype == 'res':
+            index = np.argmin(np.abs(results))
+            self.results_best = 10**10
+            test = results[index] < self.results_best
+        else:
+            index = np.argmax(np.abs(results))
+            self.results_best = 0
+            test = results[index] > self.results_best
+        if test:
+            self.parameter_best = dict(zip(self.param_names, parameter[index]))
+            self.results_best = results[index]
 
     def gridsearch(self):
         start = time.time()
@@ -45,30 +100,20 @@ class hyper_parameter_tuning():
             ('Classifier' in model_str_type and self.mtype == 'res')):
             warnings.warn("model type and model is not the same - optimizer might not be correct")
         
-        ## parallelizing
-        opt = Optimizer(self.space)
+        args, params = self.create_args()
+        parameter, results = self.parallelizing(args, params)
+        self.best_result(parameter, results)
+        for i in range(self.niter):
+            print(np.max(results))
+            args, params = self.higher_quartile(parameter, results)
+            parameter, results = self.parallelizing(args, params)
+            self.best_result(parameter, results)
+
         
-        param_names = [i.name for i in self.space]            
-        params = [opt.ask() for _ in range(self.ncalls)]
-        
-        args = ((self.model, param_names, b) for b in params)
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            result = executor.map(self.setting_parameters, args)
-            results = []
-            parameter = []
-            print(f'Time it took: {time.time()-start}s')
-            for r, param in tqdm(zip(result, params)):
-                results.append(r)
-                parameter.append(param)
-        if self.mtype == 'res':
-            index = np.argmin(np.abs(results))
-        else:
-            index = np.argmax(np.abs(results))
-        parameter = dict(zip(param_names, parameter[index]))
-        print(f'\nMinimum score: {results[index]}')
-        print(f'Parameters: {parameter}')
+        print(f'\nMinimum score: {self.results_best}')
+        print(f'Parameters: {self.parameter_best}')
         print(f'Time it took: {time.time()-start}s')
-        return parameter, results[index]
+        return parameter, results
     
 
 
