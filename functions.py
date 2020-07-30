@@ -46,19 +46,17 @@ class hyper_parameter_tuning():
             warnings.warn("model type and model is not the same - optimizer might not be correct")
         
         ## parallelizing
-        param_names = []
-        for i in self.space:
-            param_names.append(i.name)
-            
         opt = Optimizer(self.space)
-        params = []
-        for i in range(self.ncalls):
-            params.append(opt.ask())
+        
+        param_names = [i.name for i in self.space]            
+        params = [opt.ask() for _ in range(self.ncalls)]
+        
         args = ((self.model, param_names, b) for b in params)
         with concurrent.futures.ProcessPoolExecutor() as executor:
             result = executor.map(self.setting_parameters, args)
             results = []
             parameter = []
+            print(f'Time it took: {time.time()-start}s')
             for r, param in tqdm(zip(result, params)):
                 results.append(r)
                 parameter.append(param)
@@ -70,7 +68,7 @@ class hyper_parameter_tuning():
         print(f'\nMinimum score: {results[index]}')
         print(f'Parameters: {parameter}')
         print(f'Time it took: {time.time()-start}s')
-        return parameter
+        return parameter, results[index]
     
 
 
