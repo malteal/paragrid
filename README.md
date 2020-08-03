@@ -25,7 +25,7 @@ breast_cancer = load_breast_cancer()
 X, y = breast_cancer.data, breast_cancer.target    
 lgbm_cls = LGBMClassifier()
 
-params = hyper_parameter_tuning(model=lgbm_cls, space=space_gpdt,
+params = paragrid(model=lgbm_cls, space=space_gpdt,
                          X=X, y=y, ncalls = 20, mtype = 'cls',
                          niter = 0)
 params, results = params.gridsearch()
