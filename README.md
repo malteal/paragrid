@@ -1,4 +1,4 @@
-# OP Gridsearch
+# Parallel gridsearch
 
 
 
