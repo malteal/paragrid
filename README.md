@@ -1,6 +1,4 @@
-# Parallel gridsearch
-
-
+# paragrid
 
 ## Example
 ```python
