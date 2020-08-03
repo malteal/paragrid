@@ -5,22 +5,17 @@ import re
 from tqdm import tqdm
 
 import numpy as np
-
 from skopt.space import Real, Integer
-from skopt.utils import use_named_args
-from skopt import gp_minimize, Optimizer
-
 from sklearn.model_selection import cross_val_score
 
-# https://github.com/cgnorthcutt/hypopt
-
-#%%
 class hyper_parameter_tuning():
     
-    def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res', niter = 1):
+    def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res',
+                 niter = 0, model_name = 'scikit'):
         self.X, self.y, self.niter = X, y, niter
         self.model, self.space = model, space
         self.ncalls, self.mtype = ncalls, mtype
+        self.model_name = model_name
         
         if self.mtype == 'res':
             self.results_best = 10**10
