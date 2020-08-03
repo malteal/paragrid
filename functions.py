@@ -21,7 +21,11 @@ class hyper_parameter_tuning():
         self.X, self.y, self.niter = X, y, niter
         self.model, self.space = model, space
         self.ncalls, self.mtype = ncalls, mtype
-    
+        
+        if self.mtype == 'res':
+            self.results_best = 10**10
+        else:
+            self.results_best = 0
     
     def objetive(self, model):
         return np.mean(cross_val_score(model, self.X, self.y, cv = 5))
@@ -38,8 +42,7 @@ class hyper_parameter_tuning():
             result = executor.map(self.setting_parameters, args)
             results = []
             parameter = []
-            # print(f'Time it took: {time.time()-start}s')
-        for r, param in tqdm(zip(result, params)):
+        for r, param in zip(result, params):
             results.append(r)
             parameter.append(param)
         return parameter, results
@@ -75,15 +78,15 @@ class hyper_parameter_tuning():
         args, params = self.create_args()
         return args, params
     
-    def best_result(self, parameter, results):
+    def select_best(self, parameter, results):
         if self.mtype == 'res':
             index = np.argmin(np.abs(results))
-            self.results_best = 10**10
             test = results[index] < self.results_best
+            
         else:
             index = np.argmax(np.abs(results))
-            self.results_best = 0
             test = results[index] > self.results_best
+            
         if test:
             self.parameter_best = dict(zip(self.param_names, parameter[index]))
             self.results_best = results[index]
@@ -102,15 +105,15 @@ class hyper_parameter_tuning():
         
         args, params = self.create_args()
         parameter, results = self.parallelizing(args, params)
-        self.best_result(parameter, results)
-        for i in range(self.niter):
+        self.select_best(parameter, results)
+        for i in tqdm(range(self.niter)):
             print(np.max(results))
             args, params = self.higher_quartile(parameter, results)
             parameter, results = self.parallelizing(args, params)
-            self.best_result(parameter, results)
+            self.select_best(parameter, results)
 
         
-        print(f'\nMinimum score: {self.results_best}')
+        print(f'\nBest score: {self.results_best}')
         print(f'Parameters: {self.parameter_best}')
         print(f'Time it took: {time.time()-start}s')
         return parameter, results

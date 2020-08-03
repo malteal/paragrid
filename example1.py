@@ -35,13 +35,12 @@ if __name__ == "__main__":
               # Integer(2, X.shape[1], name='max_features'),
                Integer(2, 50, name='n_estimators')
               ]
-    
     space_knn = [Integer(3, 400, name='n_neighbors')]
     
-    ncalls = 10
+    ncalls = 40*3
     params = hyper_parameter_tuning(model=reg_cls_gpdt, space=space_gpdt,
                                     X=X, y=y, ncalls = ncalls, mtype = 'cls',
-                                    niter = 3)
+                                    niter = 0)
     params, results = params.gridsearch()
     
     #%%
@@ -61,12 +60,12 @@ if __name__ == "__main__":
     sc = ax.scatter(x,y,z, c=results[mask])
     plt.colorbar(sc)
     plt.show()
-    plt.figure()
-    plt.scatter(x,z, c=results[mask])
-    plt.figure()
-    plt.scatter(y,z, c=results[mask])
-    plt.figure()
-    plt.scatter(x,y, c=results[mask])
+    # plt.figure()
+    # plt.scatter(x,z, c=results[mask])
+    # plt.figure()
+    # plt.scatter(y,z, c=results[mask])
+    # plt.figure()
+    # plt.scatter(x,y, c=results[mask])
     
     # import time
     # start = time.time()
