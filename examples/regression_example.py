@@ -1,16 +1,14 @@
 # Help packages
-from sklearn.datasets import load_boston, load_breast_cancer
+from sklearn.datasets import load_boston
 from skopt.space import Real, Integer
 import numpy as np
 import matplotlib.pyplot as plt
 
 # Classifiers
-from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import GradientBoostingRegressor
 
 # Parallel gridsearch
-from functions import hyper_parameter_tuning
+from functions import paragrid
 
 def plot_param_space_3d(params, results):
     fig = plt.figure()
@@ -37,26 +35,12 @@ if __name__ == "__main__":
               ]
     ncalls = 20
     
-    # Classification
-    breast_cancer = load_breast_cancer()
-    X, y = breast_cancer.data, breast_cancer.target    
-    reg_cls_gpdt = GradientBoostingClassifier()
-    xbg_cls = XGBClassifier()
-    lgbm_cls = LGBMClassifier()
-    
-    params = hyper_parameter_tuning(model=lgbm_cls, space=space_gpdt,
-                                    X=X, y=y, ncalls = ncalls, mtype = 'cls',
-                                    niter = 0)
-    params, results = params.gridsearch()
-    
-    plot_param_space_3d(params, results)
-    
     # Regression
     boston = load_boston()
     X, y = boston.data, boston.target
     reg_gpdt = GradientBoostingRegressor(loss = 'lad')
     
-    params = hyper_parameter_tuning(model=reg_gpdt, space=space_gpdt,
+    params = paragrid(model=reg_gpdt, space=space_gpdt,
                                 X=X, y=y, ncalls = ncalls, mtype = 'res',
                                 niter = 0)
     

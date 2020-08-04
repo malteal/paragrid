@@ -8,7 +8,7 @@ import numpy as np
 from skopt.space import Real, Integer
 from sklearn.model_selection import cross_val_score
 
-class hyper_parameter_tuning():
+class paragrid():
     
     def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res',
                  niter = 0, model_name = 'scikit'):
