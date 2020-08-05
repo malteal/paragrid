@@ -1,2 +1,2 @@
 from paragrid.paragrid import paragrid
-from .version import version__
+from .version import __version__

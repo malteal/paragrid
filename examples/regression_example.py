@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import GradientBoostingRegressor
 
 # Parallel gridsearch
-from functions import paragrid
+from paragrid import paragrid
 
 def plot_param_space_3d(params, results):
     fig = plt.figure()
