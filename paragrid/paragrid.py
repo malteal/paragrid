@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 import numpy as np
 from skopt.space import Real, Integer
+from skopt import Optimizer
 from sklearn.model_selection import cross_val_score
 
 class paragrid():
