@@ -33,7 +33,7 @@ if __name__ == "__main__":
                # Real(10**-3, 1, name='subsample'),
               # Integer(2, X.shape[1], name='max_features'),
               ]
-    ncalls = 20
+    ncalls = 10
     
     # Regression
     boston = load_boston()

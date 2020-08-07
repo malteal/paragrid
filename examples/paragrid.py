@@ -12,6 +12,7 @@ from sklearn.model_selection import cross_val_score
 class paragrid():
     def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res',
                  niter = 0, model_name = 'scikit'):
+        print(model)
         self.X, self.y, self.niter = X, y, niter
         self.model, self.space = model, space
         self.ncalls, self.mtype = ncalls, mtype

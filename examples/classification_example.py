@@ -10,7 +10,7 @@ from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
 # Parallel gridsearch
-from functions import paragrid
+from paragrid import paragrid
 
 def plot_param_space_3d(params, results):
     fig = plt.figure()
@@ -48,7 +48,7 @@ if __name__ == "__main__":
                                     X=X, y=y, ncalls = ncalls, mtype = 'cls',
                                     niter = 0)
     params, results = params.gridsearch()
-    
+
     plot_param_space_3d(params, results)
     
 
