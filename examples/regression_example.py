@@ -6,9 +6,7 @@ import matplotlib.pyplot as plt
 
 # Classifiers
 from sklearn.ensemble import GradientBoostingRegressor
-
-# Parallel gridsearch
-from paragrid import paragrid
+import paragrid
 
 def plot_param_space_3d(params, results):
     fig = plt.figure()
@@ -26,13 +24,8 @@ def plot_param_space_3d(params, results):
     plt.show()
 
 if __name__ == "__main__":
+    
     # spaces
-    # space_gpdt = [#Integer(2, 50, name='max_depth'),
-    #            Real(0.01, 0.1, "log-uniform", name='learning_rate'),
-    #            Integer(2, 50, name='n_estimators'),
-    #            # Real(10**-3, 1, name='subsample'),
-    #           # Integer(2, X.shape[1], name='max_features'),
-    #           ]
     space_gpdt = {'learning_rate': [0.01, 0.1, 10],
                'n_estimators': [2, 50, 10], 'loss' : ['ls', 'lad']}
     ncalls = 100
@@ -48,6 +41,7 @@ if __name__ == "__main__":
     
     params, results = params.gridsearch()
     
+    param_best = params.score()
     # plot_param_space_3d(params, results)
 
 

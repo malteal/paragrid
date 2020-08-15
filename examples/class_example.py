@@ -9,7 +9,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 
 # Parallel gridsearch
-from paragrid import paragrid
+import paragrid
 
 def test_func(X, y, std, learning_rate, n_estimators):
     mask = std<np.std(X, axis = 0)
@@ -21,9 +21,6 @@ def test_func(X, y, std, learning_rate, n_estimators):
 
 if __name__ == "__main__":
     # spaces
-    # space_func = [Real(1, 20, "log-uniform", name='std'),
-    #               Real(0.01, 0.1, "log-uniform", name='learning_rate'),
-    #               Integer(2, 50, name='n_estimators')]
     space_func = [{'std': [1, 20], 'learning_rate': [0.01, 0.1],
                    'n_estimators': [2, 50]}]
     ncalls = 10
