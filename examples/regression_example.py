@@ -27,26 +27,28 @@ def plot_param_space_3d(params, results):
 
 if __name__ == "__main__":
     # spaces
-    space_gpdt = [Integer(2, 50, name='max_depth'),
-               Real(0.01, 0.1, "log-uniform", name='learning_rate'),
-               Integer(2, 50, name='n_estimators'),
-               # Real(10**-3, 1, name='subsample'),
-              # Integer(2, X.shape[1], name='max_features'),
-              ]
-    ncalls = 10
+    # space_gpdt = [#Integer(2, 50, name='max_depth'),
+    #            Real(0.01, 0.1, "log-uniform", name='learning_rate'),
+    #            Integer(2, 50, name='n_estimators'),
+    #            # Real(10**-3, 1, name='subsample'),
+    #           # Integer(2, X.shape[1], name='max_features'),
+    #           ]
+    space_gpdt = {'learning_rate': [0.01, 0.1, 10],
+               'n_estimators': [2, 50, 10], 'loss' : ['ls', 'lad']}
+    ncalls = 100
     
     # Regression
     boston = load_boston()
     X, y = boston.data, boston.target
-    reg_gpdt = GradientBoostingRegressor(loss = 'lad')
+    reg_gpdt = GradientBoostingRegressor()
     
     params = paragrid(model=reg_gpdt, space=space_gpdt,
-                                X=X, y=y, ncalls = ncalls, mtype = 'res',
+                                X=X, y=y, ncalls = ncalls, target = 'min',
                                 niter = 0)
     
     params, results = params.gridsearch()
     
-    plot_param_space_3d(params, results)
+    # plot_param_space_3d(params, results)
 
 
 

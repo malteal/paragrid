@@ -1,36 +1,61 @@
+import inspect
 import time
 import warnings
 import concurrent.futures
 import re
 from tqdm import tqdm
+import math
+import itertools
 
 import numpy as np
 from skopt.space import Real, Integer
 from skopt import Optimizer
 from sklearn.model_selection import cross_val_score
+import skopt.space
+from numba import njit
 
 class paragrid():
-    def __init__(self, model, space, X, y, ncalls = 10, mtype = 'res',
-                 niter = 0, model_name = 'scikit'):
+    
+    def __init__(self, model, space: [list, dict], X, y, ncalls = 10, target = 'min',
+                 niter = 0, func_type = 'ML'):
+        assert target in ['min', 'max'], 'target parameter must be min or max'
+        assert func_type in ['ML', 'func'], 'func_type parameter must be ML or func'
+        
         self.X, self.y, self.niter = X, y, niter
         self.model, self.space = model, space
-        self.ncalls, self.mtype = ncalls, mtype
-        self.model_name = model_name
-
+        self.ncalls, self.target = ncalls, target
+        self.func_type = func_type
+        if func_type == 'func':
+            self.func_para = inspect.getargspec(model)[0]
         
-        if self.mtype == 'res':
+        if self.target == 'min':
             self.results_best = 10**10
-        else:
-            self.results_best = 0
-    
+        elif self.target == 'max':
+            self.results_best = 0.0
+            
+        if type(space) == dict:
+            # warnings.warn("ncalls not being used")
+            print('Warning: ncalls not being used')
+            
     def objetive(self, model):
         return np.mean(cross_val_score(model, self.X, self.y, cv = 5))
 
     def setting_parameters(self, params):
         model, order, param = params
         param = dict(zip(order, param))
-        self.model.set_params(**param)
-        score = self.objetive(self.model)
+        
+        if self.func_type == 'ML':
+            self.model.set_params(**param)
+            score = self.objetive(self.model)
+        elif self.func_type == 'func':
+            if 'X' in self.func_para:
+                param['X'] = self.X
+            if 'y' in self.func_para:
+                param['y'] = self.y
+                
+            assert ~any([i not in param.keys() for i in self.func_para]), 'Parameter missing'
+            score = self.model(**param)
+            
         return score
     
     def parallelizing(self, args, params):
@@ -44,15 +69,39 @@ class paragrid():
         return parameter, results
 
     def create_args(self):
-        opt = Optimizer(self.space)
-        self.param_names = [i.name for i in self.space]            
-        params = [opt.ask() for _ in range(self.ncalls)]
+        if type(self.space):
+            self.param_names = [i for i in self.space.keys()]
+            param_list = []
+            for i in self.param_names:
+                dtype = ('int' if all([type(i) == int for i in self.space[i][:2]])
+                         else 'float' if all([type(i) == float for i in self.space[i][:2]])
+                         else 'str')
+                if dtype == 'str':
+                    param_list.append(np.array(self.space[i]))
+                else:
+                    param_list.append(np.linspace(self.space[i][0],
+                                                  self.space[i][1],
+                                                  self.space[i][2],
+                                                  dtype = dtype))
+            params = [i for i in itertools.product(*param_list)]
+            print(f'Number of iterations: {len(params)}')
+        else:
+            opt = Optimizer(self.space)
+            self.param_names = [i.name for i in self.space]            
+            params = [opt.ask() for _ in range(self.ncalls)]
+            
         args = ((self.model, self.param_names, b) for b in params)
         return args, params
     
     def higher_quartile(self, parameter, results):
-        if self.mtype == 'res':
-            mask = results < np.percentile(results, 10)
+        results = np.array(results)
+        if self.target == 'min':
+            if all(results < 0):
+                mask = results > np.percentile(results, 90)
+            elif all(results > 0):
+                mask = results < np.percentile(results, 10)
+            else:
+                mask = abs(results) < np.percentile(abs(results), 30)
         else: 
             mask = results > np.percentile(results, 90)
 
@@ -75,11 +124,10 @@ class paragrid():
         return args, params
     
     def select_best(self, parameter, results):
-        if self.mtype == 'res':
+        if self.target == 'min':
             index = np.argmin(np.abs(results))
-            test = results[index] < self.results_best
-            
-        else:
+            test = results[index] < self.results_best   
+        elif self.target == 'max':
             index = np.argmax(np.abs(results))
             test = results[index] > self.results_best
             
@@ -89,16 +137,8 @@ class paragrid():
 
     def gridsearch(self):
         start = time.time()
-        ## warnings/errors
-        mtypes = ['res', 'cls']
-        if self.mtype not in mtypes:
-            raise ValueError("Invalid model type. Expected one of: %s" % mtypes)
-            
-        model_str_type = re.findall('[A-Z][^A-Z]*',str(self.model).split('(')[0])
-        if (('Regressor' in model_str_type and self.mtype == 'cls') or 
-            ('Classifier' in model_str_type and self.mtype == 'res')):
-            warnings.warn("model type and model is not the same - optimizer might not be correct")
-        
+
+        # model_str_type = re.findall('[A-Z][^A-Z]*',str(self.model).split('(')[0])
         args, params = self.create_args()
         parameter, results = self.parallelizing(args, params)
         self.select_best(parameter, results)
@@ -114,5 +154,6 @@ class paragrid():
         return parameter, results
     
 
-
+    def score(self):
+        return self.parameter_best
 
