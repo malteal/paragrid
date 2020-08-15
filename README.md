@@ -22,7 +22,8 @@ git clone https://github.com/malteal/paragrid.git
 ### Usage
 
 #### Function
-Example for using paragrid to find the optimal parameters of a function
+Example for using paragrid to find the optimal parameters of a function.
+Ex: std: from 1 to 20 and 5 points in between.
 ```python
 from sklearn.datasets import load_boston
 import numpy as np
@@ -43,8 +44,8 @@ def test_func(X, y, std, learning_rate, n_estimators):
     return np.mean(cross_val_score(reg_gpdt, X, y, cv = 5))
 
 # spaces
-space_func = [{'std': [1, 20], 'learning_rate': [0.01, 0.1],
-               'n_estimators': [2, 50]}]
+space_func = {'std': [1, 20, 5], 'learning_rate': [0.01, 0.1, 5],
+               'n_estimators': [2, 50, 5]}
 # Regression
 boston = load_boston()
 X, y = boston.data, boston.target
