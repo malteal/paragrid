@@ -21,17 +21,15 @@ def test_func(X, y, std, learning_rate, n_estimators):
 
 if __name__ == "__main__":
     # spaces
-    space_func = [{'std': [1, 20], 'learning_rate': [0.01, 0.1],
-                   'n_estimators': [2, 50]}]
-    ncalls = 10
-
+    space_func = {'std': [1, 20, 10], 'learning_rate': [0.01, 0.1, 10],
+                   'n_estimators': [2, 50, 10]}
     # Regression
     boston = load_boston()
     X, y = boston.data, boston.target
 
     reg_class = test_func
     params = paragrid(model=reg_class, space=space_func,
-                      X=X, y=y, ncalls=ncalls, target='min',
+                      X=X, y=y, target='min',
                       niter=0, func_type = 'func')
     params.gridsearch()
     param = params.score()

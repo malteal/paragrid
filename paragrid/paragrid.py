@@ -8,11 +8,10 @@ import math
 import itertools
 
 import numpy as np
+import skopt.space
 from skopt.space import Real, Integer
 from skopt import Optimizer
 from sklearn.model_selection import cross_val_score
-import skopt.space
-from numba import njit
 
 class paragrid():
     

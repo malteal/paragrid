@@ -10,7 +10,7 @@ from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
 # Parallel gridsearch
-from paragrid import paragrid
+import paragrid
 
 def plot_param_space_3d(params, results):
     fig = plt.figure()
@@ -31,10 +31,8 @@ if __name__ == "__main__":
     # spaces
     space_gpdt = [Integer(2, 50, name='max_depth'),
                Real(0.01, 0.1, "log-uniform", name='learning_rate'),
-               Integer(2, 50, name='n_estimators'),
-               # Real(10**-3, 1, name='subsample'),
-              # Integer(2, X.shape[1], name='max_features'),
-              ]
+               Integer(2, 50, name='n_estimators')]
+    
     ncalls = 20
     
     # Classification
