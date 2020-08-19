@@ -14,10 +14,25 @@ from skopt import Optimizer
 from sklearn.model_selection import cross_val_score
 import matplotlib.pyplot as plt
 
+def plot_param(param, results):
+    param = np.array(param)
+    results = np.array(results)
+    results.shape = (len(results), )
+    all_params = np.zeros((len(results),3))
+    all_params[:, :2] = param
+    all_params[:, 2] = results
+    plt.scatter(all_params[:,0], all_params[:,1],
+        s = np.abs(all_params[:,2])*100, color = 'red')
+    
+    best = all_params[np.argpartition(np.abs(all_params[:,2]), 4)][:5]
+    plt.scatter(best[:,0], best[:,1],
+        s = np.abs(best[:,2])*100, color = 'blue')
+    plt.savefig(f'{np.mean(np.abs(best[:,2]))}.png')
+
 class paragrid():
     
-    def __init__(self, model, space: [list, dict], X, y, ncalls = 10, target = 'min',
-                 niter = 0, func_type = 'ML'):
+    def __init__(self, model, space: [list, dict], X=None, y=None, ncalls = 10, target = 'min',
+                 niter = 0, func_type = 'ML', plot = False):
         assert target in ['min', 'max'], 'target parameter must be min or max'
         assert func_type in ['ML', 'func'], 'func_type parameter must be ML or func'
         
@@ -25,6 +40,7 @@ class paragrid():
         self.model, self.space = model, space
         self.ncalls, self.target = ncalls, target
         self.func_type = func_type
+        self.plot = plot
         if func_type == 'func':
             self.func_para = inspect.getargspec(model)[0]
         
@@ -48,9 +64,9 @@ class paragrid():
             self.model.set_params(**param)
             score = self.objetive(self.model)
         elif self.func_type == 'func':
-            if ('X' in self.func_para) and (self.X != None):
+            if ('X' in self.func_para):
                 param['X'] = self.X
-            if ('y' in self.func_para) and (self.y != None):
+            if ('y' in self.func_para):
                 param['y'] = self.y
                 
             assert ~any([i not in param.keys() for i in self.func_para]), 'Parameter missing'
@@ -145,9 +161,14 @@ class paragrid():
             index = np.argmax(np.abs(results))
             test = results[index] > self.results_best
             
-        if test:
-            self.parameter_best = dict(zip(self.param_names, parameter[index]))
-            self.results_best = results[index]
+        try:
+            if any(test): # sometthing test is an 1D array, why.. dont know...
+                self.parameter_best = dict(zip(self.param_names, parameter[index]))
+                self.results_best = results[index]
+        except:
+            if test:
+                self.parameter_best = dict(zip(self.param_names, parameter[index]))
+                self.results_best = results[index]
 
     def gridsearch(self):
         start = time.time()
@@ -156,12 +177,12 @@ class paragrid():
         args, params = self.create_args()
         parameter, results = self.parallelizing(args, params)
         self.select_best(parameter, results)
-        self.plot_param(parameter, results)
+        self.bool_plotting(parameter, results)
         for i in tqdm(range(self.niter)):
             args, params = self.higher_quartile(parameter, results)
             parameter, results = self.parallelizing(args, params)
             self.select_best(parameter, results)
-        self.plot_param(parameter, results)
+            self.bool_plotting(self, parameter, results)
         
         print(f'\nBest score: {self.results_best}')
         print(f'Parameters: {self.parameter_best}')
@@ -172,23 +193,10 @@ class paragrid():
     def score(self):
         return self.parameter_best
     
-    @staticmethod
-    def plot_param(param, results):
-        print(1)
-        param = np.array(param)
-        print(1)
-        results = np.array(results)
-        results.shape = (len(results), )
-        all_params = np.zeros((len(results),3))
-        all_params[:, :2] = param
-        all_params[:, 2] = results
-        print(1)
-        plt.scatter(all_params[:,0], all_params[:,1],
-            s = np.abs(all_params[:,2])*100, color = 'red')
-        
-        best = all_params[np.argpartition(np.abs(all_params[:,2]), 4)][:5]
-        print(1)
-        plt.scatter(best[:,0], best[:,1],
-            s = np.abs(best[:,2])*100, color = 'blue')
-        plt.savefig(f'{np.mean(np.abs(best[:,2]))}.png')
+
+    def bool_plotting(self, parameter, results):
+        if (np.shape(parameter)[1] == 2) and self.plot:
+            plot_param(parameter, results)
+        elif self.plot and (np.shape(parameter)[1] != 2):
+            print('Error: Can only plot 2D plots - The parameter space is not 2D')
 

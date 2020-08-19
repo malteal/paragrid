@@ -21,8 +21,8 @@ def test_func(X, y, std, learning_rate, n_estimators):
 
 if __name__ == "__main__":
     # spaces
-    space_func = {'std': [1, 20, 10], 'learning_rate': [0.01, 0.1, 10],
-                   'n_estimators': [2, 50, 10]}
+    space_func = {'std': [1, 20, 3], 'learning_rate': [0.01, 0.1, 3], 
+                   'n_estimators': [2, 50, 3]}
     # Regression
     boston = load_boston()
     X, y = boston.data, boston.target
