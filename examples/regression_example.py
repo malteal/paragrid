@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # Classifiers
 from sklearn.ensemble import GradientBoostingRegressor
-import paragrid
+from paragrid import paragrid
 
 def plot_param_space_3d(params, results):
     fig = plt.figure()
@@ -26,9 +26,10 @@ def plot_param_space_3d(params, results):
 if __name__ == "__main__":
     
     # spaces
-    space_gpdt = {'learning_rate': [0.01, 0.1, 10],
-               'n_estimators': [2, 50, 10], 'loss' : ['ls', 'lad']}
-
+    space_gpdt = {'learning_rate': [0.001, 0.1, 10],
+               'n_estimators': [2, 70, 10],
+               #'loss' : ['ls', 'lad']}
+               }
     # Regression
     boston = load_boston()
     X, y = boston.data, boston.target
@@ -36,13 +37,25 @@ if __name__ == "__main__":
     
     params = paragrid(model=reg_gpdt, space=space_gpdt,
                                 X=X, y=y, target = 'min',
-                                niter = 0)
+                                niter = 1)
     
-    params, results = params.gridsearch()
+    param, results = params.gridsearch()
     
-    param_best = params.score()
     # plot_param_space_3d(params, results)
 
+    #%%
+    # param = np.array(param)
+    # results = np.array(results)
+    # results.shape = (len(results), )
+    # all_params = np.zeros((len(results),3))
+    # all_params[:, :2] = param
+    # all_params[:, 2] = results
+    # plt.scatter(all_params[:,0], all_params[:,1],
+    #             s = np.abs(all_params[:,2])*100, color = 'red')
+
+    # best = all_params[np.argpartition(np.abs(all_params[:,2]), 4)][:5]
+    # plt.scatter(best[:,0], best[:,1],
+    #             s = np.abs(best[:,2])*10000, color = 'blue')
 
 
 

@@ -12,6 +12,7 @@ import skopt.space
 from skopt.space import Real, Integer
 from skopt import Optimizer
 from sklearn.model_selection import cross_val_score
+import matplotlib.pyplot as plt
 
 class paragrid():
     
@@ -47,9 +48,9 @@ class paragrid():
             self.model.set_params(**param)
             score = self.objetive(self.model)
         elif self.func_type == 'func':
-            if 'X' in self.func_para:
+            if ('X' in self.func_para) and (self.X != None):
                 param['X'] = self.X
-            if 'y' in self.func_para:
+            if ('y' in self.func_para) and (self.y != None):
                 param['y'] = self.y
                 
             assert ~any([i not in param.keys() for i in self.func_para]), 'Parameter missing'
@@ -68,7 +69,7 @@ class paragrid():
         return parameter, results
 
     def create_args(self):
-        if type(self.space):
+        if type(self.space) == dict:
             self.param_names = [i for i in self.space.keys()]
             param_list = []
             for i in self.param_names:
@@ -108,16 +109,30 @@ class paragrid():
         parameter_low_top = []
         for i in range(len(self.param_names)):
             parameter_low_top.append([np.min(parameter[mask][:,i]), np.max(parameter[mask][:,i])])
-        space = []        
+        space = []       
+        if type(self.space) == dict:
+            space = {}
         for i, j, values in zip(self.space, self.param_names, parameter_low_top):
-            if i.dtype == np.int64:
-                if values[0]==values[1]:
-                    values = [values[0], values[1]+1]
-                space.append(Integer(values[0], values[1], name=j))
-            elif i.dtype == float:
-                if values[0]==values[1]:
-                    values = [values[0], values[1]+values[1]/100]
-                space.append(Real(values[0], values[1], name=j))
+            try: # for skopt type
+                if i.dtype == int:
+                    if values[0]==values[1]:
+                        values = [values[0], values[1]+1]
+                    space.append(Integer(values[0], values[1], name=j))
+                elif i.dtype == float:
+                    if values[0]==values[1]:
+                        values = [values[0], values[1]+values[1]/100]
+                    space.append(Real(values[0], values[1], name=j))
+            except AttributeError as e: # for dict type
+                if (type(self.space[i][0]) == int) & (type(self.space[i][1]) == int):
+                    if type(values[0])==type(values[1]):
+                        values = [int(values[0]-values[1]/100), 
+                                  int(values[1]+values[1]/100),self.space[i][2]]
+                    space[i] = values
+                elif (type(self.space[i][0]) == float) & (type(self.space[i][1]) == float):
+                    if type(values[0])==type(values[1]):
+                        values = [values[0]-values[1]/100, 
+                                  values[1]+values[1]/100,self.space[i][2]]
+                    space[i] = values
         self.space = space
         args, params = self.create_args()
         return args, params
@@ -141,11 +156,12 @@ class paragrid():
         args, params = self.create_args()
         parameter, results = self.parallelizing(args, params)
         self.select_best(parameter, results)
+        self.plot_param(parameter, results)
         for i in tqdm(range(self.niter)):
             args, params = self.higher_quartile(parameter, results)
             parameter, results = self.parallelizing(args, params)
             self.select_best(parameter, results)
-
+        self.plot_param(parameter, results)
         
         print(f'\nBest score: {self.results_best}')
         print(f'Parameters: {self.parameter_best}')
@@ -155,4 +171,24 @@ class paragrid():
 
     def score(self):
         return self.parameter_best
+    
+    @staticmethod
+    def plot_param(param, results):
+        print(1)
+        param = np.array(param)
+        print(1)
+        results = np.array(results)
+        results.shape = (len(results), )
+        all_params = np.zeros((len(results),3))
+        all_params[:, :2] = param
+        all_params[:, 2] = results
+        print(1)
+        plt.scatter(all_params[:,0], all_params[:,1],
+            s = np.abs(all_params[:,2])*100, color = 'red')
+        
+        best = all_params[np.argpartition(np.abs(all_params[:,2]), 4)][:5]
+        print(1)
+        plt.scatter(best[:,0], best[:,1],
+            s = np.abs(best[:,2])*100, color = 'blue')
+        plt.savefig(f'{np.mean(np.abs(best[:,2]))}.png')
 
