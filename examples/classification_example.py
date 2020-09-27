@@ -1,6 +1,5 @@
 # Help packages
 from sklearn.datasets import load_breast_cancer
-from skopt.space import Real, Integer
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -9,10 +8,12 @@ from sklearn.ensemble import GradientBoostingClassifier
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
+
 # Parallel gridsearch
 from paragrid import paragrid
 
-def plot_param_space_3d(params, results):
+def plot_param_space_3d(params, results): 
+    
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
@@ -29,11 +30,10 @@ def plot_param_space_3d(params, results):
 
 if __name__ == "__main__":
     # spaces
-    space_gpdt = [Integer(2, 50, name='max_depth'),
-               Real(0.01, 0.1, "log-uniform", name='learning_rate'),
-               Integer(2, 50, name='n_estimators')]
-    
-    ncalls = 20
+    space_gpdt = {'learning_rate': [0.001, 0.1, 5],
+                  'n_estimators': [2, 70, 5],
+                  'max_depth': [2, 50, 4]}
+
     
     # Classification
     breast_cancer = load_breast_cancer()
@@ -43,11 +43,10 @@ if __name__ == "__main__":
     lgbm_cls = LGBMClassifier()
     
     params = paragrid(model=reg_cls_gpdt, space=space_gpdt,
-                                    X=X, y=y, ncalls = ncalls, target = 'max',
+                                    X=X, y=y, target = 'max',
                                     niter = 1)
     param, results = params.gridsearch()
     print(params.score())
-    # plot_param_space_3d(params, results)
     
 
 

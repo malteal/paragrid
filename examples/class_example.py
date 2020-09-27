@@ -1,35 +1,27 @@
-# Help packages
-from sklearn.datasets import load_boston
-from skopt.space import Real, Integer
-import numpy as np
-import matplotlib.pyplot as plt
-
-# Classifiers
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import cross_val_score
-
 # Parallel gridsearch
 from paragrid import paragrid
 
-def test_func(X, y, std, learning_rate, n_estimators):
-    mask = std<np.std(X, axis = 0)
-    X = X[:,mask] ## setting restriction on std of columns
-    reg_gpdt = GradientBoostingRegressor(loss = 'lad',
-                                         learning_rate = learning_rate,
-                                         n_estimators = n_estimators)
-    return np.mean(cross_val_score(reg_gpdt, X, y, cv = 5))
+def test_func(a,b): # some function to minimize
+    if ((2.5 < a < 10.5) & (-5 > b > -6.5) | (0.5 < a < 3) & (-3.5 > b > -4.5)
+        | (-3.5 < a < 0.5) & (-3.5 > b > -4.5)):
+        constant = 0
+    else:
+        constant = -100
+
+    return a**2+1.5*(b+2)**2+100+constant
+
+def find_gradient(parameter, results, number_for_mean = 10):
+    parameter_sorted = [x for _,x in sorted(zip(results, parameter))]
+    return parameter_sorted[:number_for_mean]
 
 if __name__ == "__main__":
     # spaces
-    space_func = {'std': [1, 20, 3], 'learning_rate': [0.01, 0.1, 3], 
-                   'n_estimators': [2, 50, 3]}
-    # Regression
-    boston = load_boston()
-    X, y = boston.data, boston.target
+    space_func = {'a': 10, 'b': -7.5}
 
-    reg_class = test_func
-    params = paragrid(model=reg_class, space=space_func,
-                      X=X, y=y, target='min',
-                      niter=0, func_type = 'func')
-    params.gridsearch()
+    params = paragrid(model=test_func, space=space_func,
+                      target='min', niter=30,
+                      func_type = 'func')
+    parameter, results = params.gradient_decent(lr = 1)
     param = params.score()
+
+
