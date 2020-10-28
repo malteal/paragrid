@@ -33,7 +33,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 
 # Parallel gridsearch
-import paragrid
+from paragrid import paragrid
 
 def test_func(X, y, std, learning_rate, n_estimators):
     mask = std<np.std(X, axis = 0)
@@ -67,7 +67,7 @@ from sklearn.datasets import load_breast_cancer
 from lightgbm import LGBMClassifier
 
 # Parallel gridsearch
-import paragrid
+from paragrid import paragrid
 
 # spaces
 space_gpdt = {'max_depth': [2, 20, 5],
@@ -79,8 +79,7 @@ X, y = breast_cancer.data, breast_cancer.target
 lgbm_cls = LGBMClassifier()
 
 params = paragrid(model=lgbm_cls, space=space_gpdt,
-                                X=X, y=y, mtype = 'cls',
-                                niter = 0)
+                                X=X, y=y)
 params, results = params.gridsearch()
 best_params = params.score()
 ```
@@ -95,7 +94,7 @@ from sklearn.datasets import load_boston
 from sklearn.ensemble import GradientBoostingRegressor
 
 # Parallel gridsearch
-import paragrid
+from paragrid import paragrid
 
 # spaces
 space_gpdt = {'learning_rate': [0.01, 0.1, 10],
@@ -107,8 +106,7 @@ X, y = boston.data, boston.target
 reg_gpdt = GradientBoostingRegressor()
 
 params = paragrid(model=reg_gpdt, space=space_gpdt,
-                            X=X, y=y, target = 'min',
-                            niter = 0)
+                            X=X, y=y, target = 'min')
 
 params, results = params.gridsearch()
 
