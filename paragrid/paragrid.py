@@ -1,51 +1,52 @@
 import inspect
 import time
-import warnings
 import concurrent.futures
-import re
 from tqdm import tqdm
-import math
 import itertools
-
 import numpy as np
-import skopt.space
-from skopt.space import Real, Integer
-from skopt import Optimizer
+        
 from sklearn.model_selection import cross_val_score
 import matplotlib.pyplot as plt
 
-def plot_param(param, results):
-    param = np.array(param)
-    results = np.array(results)
-    results.shape = (len(results), )
-    all_params = np.zeros((len(results),3))
-    all_params[:, :2] = param
-    all_params[:, 2] = results
-    plt.scatter(all_params[:,0], all_params[:,1],
-        s = np.abs(all_params[:,2])*100, color = 'red')
+def plot_param(param, results, save: bool = False): # ! todo add 3d figure
+    fig, ax = plt.subplots(figsize = (20,20))
+    xlabel = np.round(list(dict.fromkeys(np.array(param)[:,0])),4)
+    ylabel = np.round(list(dict.fromkeys(np.array(param)[:,1])),4)
+
+    results = np.abs(np.array(results))
+    results.shape = (len(xlabel),len(ylabel))
+    # results = np.flip(results[::-1].T)
+    im = plt.imshow(results)
+    cbar = ax.figure.colorbar(im, ax=ax)
     
-    best = all_params[np.argpartition(np.abs(all_params[:,2]), 4)][:5]
-    plt.scatter(best[:,0], best[:,1],
-        s = np.abs(best[:,2])*100, color = 'blue')
-    plt.savefig(f'{np.mean(np.abs(best[:,2]))}.png')
+    # labels
+    ax.set_yticks(np.arange(len(xlabel))[::2])
+    ax.set_xticks(np.arange(len(ylabel))[::2])
+    ax.set_yticklabels(xlabel[::2], fontsize = 8)
+    ax.set_xticklabels(ylabel[::2], fontsize = 8)
+
+    plt.show()
+    if save:
+        plt.savefig(f'figure.png')
 
 class paragrid():
-    
-    def __init__(self, model, space: [list, dict], X=None, y=None, ncalls = 10, target = 'min',
+    def __init__(self, model: [], space: dict, X=None,  y=None, target = 'min',
                  niter = 0, func_type = 'ML', plot = False):
         assert target in ['min', 'max'], 'target parameter must be min or max'
         assert func_type in ['ML', 'func'], 'func_type parameter must be ML or func'
-        
+        plt.close('all')
         self.X, self.y, self.niter = X, y, niter
         self.model, self.space = model, space
-        self.ncalls, self.target = ncalls, target
+        self.target = target
         self.func_type = func_type
         self.plot = plot
+        self.lr, self.old_parameter, self.old_results = None, None, None
+        
         if func_type == 'func':
             self.func_para = inspect.getargspec(model)[0]
         
         if self.target == 'min':
-            self.results_best = 10**10
+            self.results_best = 10**100
         elif self.target == 'max':
             self.results_best = 0.0
             
@@ -76,18 +77,21 @@ class paragrid():
     
     def parallelizing(self, args, params):
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            result = executor.map(self.setting_parameters, args)
-            results = []
+            if self.niter == 0:
+                results = list(tqdm(executor.map(self.setting_parameters, args),
+                                    total = len(params)))
+            else:
+                results = list(executor.map(self.setting_parameters, args))
             parameter = []
-        for r, param in zip(result, params):
-            results.append(r)
+
+        for param in params:
             parameter.append(param)
         return parameter, results
-
+    
     def create_args(self):
-        if type(self.space) == dict:
-            self.param_names = [i for i in self.space.keys()]
-            param_list = []
+        self.param_names = [i for i in self.space.keys()]
+        param_list = []
+        if self.lr is None:
             for i in self.param_names:
                 dtype = ('int' if all([type(i) == int for i in self.space[i][:2]])
                          else 'float' if all([type(i) == float for i in self.space[i][:2]])
@@ -100,12 +104,27 @@ class paragrid():
                                                   self.space[i][2],
                                                   dtype = dtype))
             params = [i for i in itertools.product(*param_list)]
-            print(f'Number of iterations: {len(params)}')
         else:
-            opt = Optimizer(self.space)
-            self.param_names = [i.name for i in self.space]            
-            params = [opt.ask() for _ in range(self.ncalls)]
-            
+            self.lr = 1/self.lr #!!!todo to be changed reducing lr for the radius
+            N = 100 #@todo this nees to be an attr
+            dim = len(self.param_names)
+            norm = np.random.normal
+            normal_deviates = norm(size=(dim, N))
+            radius = np.sqrt((normal_deviates**2).sum(axis=0))*self.lr
+            points = np.array(normal_deviates/radius)
+            parameter = np.array(list(self.space.values()))
+            parameter.shape = (dim,1)
+            params = parameter+points
+            if (self.old_parameter is not None) & (self.old_results is not None):
+                old_center = np.array(list(self.old_space.values()))
+                old_center.shape = (dim,1)
+                params_old = old_center-params
+                # print(np.sqrt(np.sum(old_center.T-np.array(list(self.parameter_best.values())))**2))
+                params = np.array(tuple(map(tuple, params.T)))[np.sqrt(np.sum(params_old**2,axis=0))>1]
+                params = tuple(map(tuple, params))
+            else:
+                params = tuple(map(tuple, params.T))
+        # print(f'Number of iterations: {len(params)}') 
         args = ((self.model, self.param_names, b) for b in params)
         return args, params
     
@@ -129,26 +148,16 @@ class paragrid():
         if type(self.space) == dict:
             space = {}
         for i, j, values in zip(self.space, self.param_names, parameter_low_top):
-            try: # for skopt type
-                if i.dtype == int:
-                    if values[0]==values[1]:
-                        values = [values[0], values[1]+1]
-                    space.append(Integer(values[0], values[1], name=j))
-                elif i.dtype == float:
-                    if values[0]==values[1]:
-                        values = [values[0], values[1]+values[1]/100]
-                    space.append(Real(values[0], values[1], name=j))
-            except AttributeError as e: # for dict type
-                if (type(self.space[i][0]) == int) & (type(self.space[i][1]) == int):
-                    if type(values[0])==type(values[1]):
-                        values = [int(values[0]-values[1]/100), 
-                                  int(values[1]+values[1]/100),self.space[i][2]]
-                    space[i] = values
-                elif (type(self.space[i][0]) == float) & (type(self.space[i][1]) == float):
-                    if type(values[0])==type(values[1]):
-                        values = [values[0]-values[1]/100, 
-                                  values[1]+values[1]/100,self.space[i][2]]
-                    space[i] = values
+            if (type(self.space[i][0]) == int) & (type(self.space[i][1]) == int):
+                if type(values[0])==type(values[1]):
+                    values = [int(values[0]-values[1]/100), 
+                              int(values[1]+values[1]/100),self.space[i][2]]
+                space[i] = values
+            elif (type(self.space[i][0]) == float) & (type(self.space[i][1]) == float):
+                if type(values[0])==type(values[1]):
+                    values = [values[0]-values[1]/100, 
+                              values[1]+values[1]/100,self.space[i][2]]
+                space[i] = values
         self.space = space
         args, params = self.create_args()
         return args, params
@@ -182,18 +191,75 @@ class paragrid():
             args, params = self.higher_quartile(parameter, results)
             parameter, results = self.parallelizing(args, params)
             self.select_best(parameter, results)
-            self.bool_plotting(self, parameter, results)
+            self.bool_plotting(parameter, results)
         
         print(f'\nBest score: {self.results_best}')
         print(f'Parameters: {self.parameter_best}')
         print(f'Time it took: {time.time()-start}s')
         return parameter, results
     
-
+    def find_gradient(self, parameter, results, number_for_mean = 10):
+        # print(parameter)
+        parameter_sorted = [x for _,x in sorted(zip(results, parameter))][:number_for_mean]
+        mean_parameter = np.mean(parameter_sorted, axis = 0)
+        self.old_space, self.old_parameter = self.space.copy(), parameter.copy()
+        self.old_results = results.copy()
+        for name, value in zip(self.param_names, mean_parameter):
+            self.space[name] = value
+        args, params = self.create_args()
+        return args, params
+    
+    def gradient_decent(self, lr: float, valid = 20):
+        self.lr = lr
+        start = time.time()
+        args, params = self.create_args()
+        parameter, results = self.parallelizing(args, params)
+        self.select_best(parameter, results)
+        self.bool_plotting(parameter, results)
+        jump_out_of_loop = 0 # !todo name change
+        for i in tqdm(range(self.niter)):
+            args, params = self.find_gradient(parameter, results)
+            parameter, results = self.parallelizing(args, params)
+            self.select_best(parameter, results)
+            self.bool_plotting(parameter, results)
+            self.plots_gradient(parameter, results, i)
+            if ((self.target == 'min') & (self.results_best < np.min(results)) |
+                (self.target == 'max') & (self.results_best > np.min(results))):
+                jump_out_of_loop += 1
+                if valid == jump_out_of_loop:
+                    print('The result has not improved from'
+                          f'{jump_out_of_loop} iterations')
+                    break
+                
+        
+        print(f'\nBest score: {self.results_best}')
+        print(f'Parameters: {self.parameter_best}')
+        print(f'Time it took: {time.time()-start}s')
+        return parameter, results
+    
     def score(self):
         return self.parameter_best
     
-
+    def plots_gradient(self, parameter, result, niter):
+        z = []
+        size = 12
+        for i, j in itertools.product(range(-size,size), range(-size,size)):
+            z.append(self.model(i,j))
+        parameter_sorted = [x for _,x in sorted(zip(result, parameter))]
+        parameter_sorted = parameter_sorted[:10]
+        t = np.array(z)
+        t.shape = (2*size,2*size)
+        t = np.flip(t[::-1].T)
+        im = plt.imshow(t, extent=[-size, size, -size, size])
+        plt.plot(np.array(parameter)[:,0], np.array(parameter)[:,1], 'b.')
+        plt.plot(np.array(parameter_sorted)[:,0], np.array(parameter_sorted)[:,1], 'go')
+        plt.plot(10,-7.5, 'rx')
+        plt.xlabel('a')
+        plt.title(f'Number of iteration: {niter}')
+        plt.ylabel('b')
+        plt.show()
+        plt.savefig(f'./figures/{niter}.png')
+        
     def bool_plotting(self, parameter, results):
         if (np.shape(parameter)[1] == 2) and self.plot:
             plot_param(parameter, results)

@@ -2,17 +2,16 @@ from distutils.core import setup
 setup(
   name = 'paragrid',         # How you named your package folder (MyLib)
   packages = ['paragrid'],   # Chose the same as "name"
-  version = '0.0.6',      # Start with a small number and increase it with every change you make
+  version = '0.0.8',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
-  description = 'Simple parallelized grid search using scikits Optimizer to find the best hyperparameters',   # Give a short description about your library
+  description = 'Simple parallelized grid search to find the best hyperparameters',   # Give a short description about your library
   author = 'Malte Algren',                   # Type in your name
   author_email = 'malte__algren@hotmail.com',      # Type in your E-Mail
   url = 'https://github.com/malteal/paragrid',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/malteal/paragrid/archive/0.0.6.tar.gz',    # I explain this later on
+  download_url = 'https://github.com/malteal/paragrid/archive/0.0.8.tar.gz',    # I explain this later on
   keywords = ['machinelearning', 'gridsearchcv', 'parallel-computing'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'numpy',
-          'scikit-optimize',
           'sklearn',
           'matplotlib',
           'xgboost',

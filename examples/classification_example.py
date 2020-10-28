@@ -1,11 +1,11 @@
-# Help packages
+    # Help packages
 from sklearn.datasets import load_breast_cancer
 import numpy as np
 import matplotlib.pyplot as plt
 
 # Classifiers
 from sklearn.ensemble import GradientBoostingClassifier
-from xgboost import XGBClassifier
+# from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     breast_cancer = load_breast_cancer()
     X, y = breast_cancer.data, breast_cancer.target    
     reg_cls_gpdt = GradientBoostingClassifier()
-    xbg_cls = XGBClassifier()
+    # xbg_cls = XGBClassifier()
     lgbm_cls = LGBMClassifier()
     
     params = paragrid(model=reg_cls_gpdt, space=space_gpdt,
