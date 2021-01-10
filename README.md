@@ -25,94 +25,102 @@ git clone https://github.com/malteal/paragrid.git
 Example for using paragrid to find the optimal parameters of a function.
 Ex: std: from 1 to 20 and 5 points in between.
 ```python
-from sklearn.datasets import load_boston
-import numpy as np
-
-# Classifiers
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import cross_val_score
-
-# Parallel gridsearch
 from paragrid import paragrid
+import numpy as np 
+import matplotlib.pyplot as plt
+def test_func(a,b): # some function to minimize
+    if ((2.5 < a < 10.5) & (-5 > b > -6.5) | (0.5 < a < 3) & (-3.5 > b > -4.5)
+        | (-3.5 < a < 0.5) & (-3.5 > b > -4.5)):
+        constant = 0
+    else:
+        constant = -100
 
-def test_func(X, y, std, learning_rate, n_estimators):
-    mask = std<np.std(X, axis = 0)
-    X = X[:,mask] ## setting restriction on std of columns
-    reg_gpdt = GradientBoostingRegressor(loss = 'lad',
-                                         learning_rate = learning_rate,
-                                         n_estimators = n_estimators)
-    return np.mean(cross_val_score(reg_gpdt, X, y, cv = 5))
+    return a**2+1.5*(b+2)**2+100+constant
 
-# spaces
-space_func = {'std': [1, 20, 5],
-              'learning_rate': [0.01, 0.1, 5],
-              'n_estimators': [2, 50, 5]}
-# Regression
-boston = load_boston()
-X, y = boston.data, boston.target
+def find_gradient(parameter, results, number_for_mean = 10):
+    parameter_sorted = [x for _,x in sorted(zip(results, parameter))]
+    return parameter_sorted[:number_for_mean]
 
-reg_class = test_func
-params = paragrid(model=reg_class, space=space_func,
-                  X=X, y=y, target='min',
-                  niter=0, func_type = 'func')
-params.gridsearch()
-param = params.score()
+if __name__ == "__main__":
+    # spaces
+    n = 300
+    space_func = {'a':  [-10,10, n], 'b': [-10,10, n]}
+
+    params = paragrid(model=test_func, space=space_func, func_type = 'func')
+    # parameter, results = params.gradient_decent(lr = 1)
+    parameters, results = params.gridsearch(optimize=False, order = True)
+    # param = params.score()
+    results =np.array(results)
+    results.shape = (n,n)
+    plt.contourf(np.linspace(-10, 10, n), np.linspace(-10, 10, n), np.array(results.T))
 ```
 #### Classification
 Example for using paragrid for classification in ML using scikit-optimize
 ```python
+# Help packages
 from sklearn.datasets import load_breast_cancer
 
 # Classifiers
+from sklearn.ensemble import GradientBoostingClassifier
 from lightgbm import LGBMClassifier
+
 
 # Parallel gridsearch
 from paragrid import paragrid
 
-# spaces
-space_gpdt = {'max_depth': [2, 20, 5],
-              'learning_rate': [0.01, 0.1, 5],
-              'n_estimators': [2, 50, 5]}
-# Classification
-breast_cancer = load_breast_cancer()
-X, y = breast_cancer.data, breast_cancer.target    
-lgbm_cls = LGBMClassifier()
 
-params = paragrid(model=lgbm_cls, space=space_gpdt,
-                                X=X, y=y)
-params, results = params.gridsearch()
-best_params = params.score()
+if __name__ == "__main__":
+    # spaces
+    space_gpdt = {'learning_rate': [0.1,0.3,0.4, 0.6,0.8, 1],
+                  'n_estimators': [200, 400, 600, 800, 1000],
+                  'max_depth': [2]}
+
+    
+    # Classification
+    breast_cancer = load_breast_cancer()
+    X, y = breast_cancer.data, breast_cancer.target    
+    reg_cls_gpdt = GradientBoostingClassifier()
+    # xbg_cls = XGBClassifier()
+    lgbm_cls = LGBMClassifier()
+    
+    params = paragrid(model=reg_cls_gpdt, space=space_gpdt, func_type='ML', own_trial=True)
+    
+    param, results = params.gridsearch(optimize=True,X=X, y=y, target = 'max', order=False, niter=5)
+
+    print(params.score())
+    best_param = params.score()
 ```
 #### Regression
 Example for using paragrid for regression in ML with normal gridsearch.
 Ex: learning_rate: from 0.01 to 0.1 and 10 points in between.
 ``` python
-# Data
+# Help packages
 from sklearn.datasets import load_boston
 
 # Classifiers
 from sklearn.ensemble import GradientBoostingRegressor
-
-# Parallel gridsearch
 from paragrid import paragrid
 
-# spaces
-space_gpdt = {'learning_rate': [0.01, 0.1, 10],
-              'n_estimators': [2, 50, 10]}
+if __name__ == "__main__":
+    
+    # spaces
+    space_gpdt = {'learning_rate': [0.001, 0.1, 10],
+               'n_estimators': [2, 70, 10]}
+    # Regression
+    boston = load_boston()
+    X, y = boston.data, boston.target
+    reg_gpdt = GradientBoostingRegressor()
+    
+    params = paragrid(model=reg_gpdt, space=space_gpdt, func_type='ML')
+    
+    param, results = params.gridsearch(optimize=True,X=X, y=y, target = 'min', order=True, niter=2)
 
-# Regression
-boston = load_boston()
-X, y = boston.data, boston.target
-reg_gpdt = GradientBoostingRegressor()
-
-params = paragrid(model=reg_gpdt, space=space_gpdt,
-                            X=X, y=y, target = 'min')
-
-params, results = params.gridsearch()
-
-param_best = params.score()
+    print(params.score())
+    best_param = params.score()
+   
 ```
 ### Bruce force gradient descent
+##### Not working at the moment
 ```diff
 --Gradient descent is only working with floats as parameters. (int and/or string will not work)--
 ```
@@ -154,7 +162,7 @@ Here is a visual representation of the gradient descent
 ## Future improvements
 - Add the missing description to the functions
 - Add error checking for functions
-- Add int/string support for gradient descent
+- Fix gradient descent
 - Add numba support
 
 ## License
