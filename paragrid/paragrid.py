@@ -1,5 +1,6 @@
 import inspect
 import time
+import types
 import concurrent.futures
 from tqdm import tqdm
 import itertools
@@ -30,29 +31,20 @@ def plot_param(param, results, save: bool = False): # ! todo add 3d figure
         plt.savefig(f'figure.png')
 
 class paragrid():
-    def __init__(self, model: [], space: dict, X=None,  y=None, target = 'min',
-                 niter = 0, func_type = 'ML', plot = False):
-        assert target in ['min', 'max'], 'target parameter must be min or max'
+    def __init__(self, model: types.FunctionType, space: dict, func_type: str, own_trial:bool=False, verbose=0):
         assert func_type in ['ML', 'func'], 'func_type parameter must be ML or func'
-        plt.close('all')
-        self.X, self.y, self.niter = X, y, niter
+        assert isinstance(space, dict), 'The space must be a dict'
+        if 'func' in func_type:
+            assert isinstance(model, types.FunctionType), 'The space must be a dict'
         self.model, self.space = model, space
-        self.target = target
         self.func_type = func_type
-        self.plot = plot
         self.lr, self.old_parameter, self.old_results = None, None, None
-        
+        self.verbose = verbose; self.own_trial=own_trial
         if func_type == 'func':
             self.func_para = inspect.getargspec(model)[0]
-        
-        if self.target == 'min':
-            self.results_best = 10**100
-        elif self.target == 'max':
-            self.results_best = 0.0
-            
-        if type(space) == dict:
-            # warnings.warn("ncalls not being used")
-            print('Warning: ncalls not being used')
+
+        if own_trial:
+            print('WARNING: own_trial has been set to True - linspace will not be used to interpolate between points.')
             
     def objetive(self, model):
         return np.mean(cross_val_score(model, self.X, self.y, cv = 5))
@@ -73,25 +65,30 @@ class paragrid():
             assert ~any([i not in param.keys() for i in self.func_para]), 'Parameter missing'
             score = self.model(**param)
             
-        return score
+        return score, param
     
-    def parallelizing(self, args, params):
+    def parallelizing(self, args, params, optimize, disable=True):
+        parameter = []
+        results = []
+        tqdm_input = {'disable': disable, 'total': len(params)}
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            if self.niter == 0:
-                results = list(tqdm(executor.map(self.setting_parameters, args),
-                                    total = len(params)))
+            if not self.order:
+                result = [executor.submit(self.setting_parameters, i) for i in args]
+                
+                for res in tqdm(concurrent.futures.as_completed(result), **tqdm_input):
+                    score, param = res.result()
+                    results.append(score)
+                    parameter.append(param)
             else:
-                results = list(executor.map(self.setting_parameters, args))
-            parameter = []
-
-        for param in params:
-            parameter.append(param)
+                results = list(tqdm(executor.map(self.setting_parameters, args), **tqdm_input))
+                results,parameter = list(zip(*results))
+                
         return parameter, results
     
     def create_args(self):
         self.param_names = [i for i in self.space.keys()]
         param_list = []
-        if self.lr is None:
+        if not self.own_trial:
             for i in self.param_names:
                 dtype = ('int' if all([type(i) == int for i in self.space[i][:2]])
                          else 'float' if all([type(i) == float for i in self.space[i][:2]])
@@ -105,25 +102,7 @@ class paragrid():
                                                   dtype = dtype))
             params = [i for i in itertools.product(*param_list)]
         else:
-            self.lr = 1/self.lr #!!!todo to be changed reducing lr for the radius
-            N = 100 #@todo this nees to be an attr
-            dim = len(self.param_names)
-            norm = np.random.normal
-            normal_deviates = norm(size=(dim, N))
-            radius = np.sqrt((normal_deviates**2).sum(axis=0))*self.lr
-            points = np.array(normal_deviates/radius)
-            parameter = np.array(list(self.space.values()))
-            parameter.shape = (dim,1)
-            params = parameter+points
-            if (self.old_parameter is not None) & (self.old_results is not None):
-                old_center = np.array(list(self.old_space.values()))
-                old_center.shape = (dim,1)
-                params_old = old_center-params
-                # print(np.sqrt(np.sum(old_center.T-np.array(list(self.parameter_best.values())))**2))
-                params = np.array(tuple(map(tuple, params.T)))[np.sqrt(np.sum(params_old**2,axis=0))>1]
-                params = tuple(map(tuple, params))
-            else:
-                params = tuple(map(tuple, params.T))
+            params=[i for i in itertools.product(*self.space.values())]
         # print(f'Number of iterations: {len(params)}') 
         args = ((self.model, self.param_names, b) for b in params)
         return args, params
@@ -131,71 +110,107 @@ class paragrid():
     def higher_quartile(self, parameter, results):
         results = np.array(results)
         if self.target == 'min':
-            if all(results < 0):
-                mask = results > np.percentile(results, 90)
-            elif all(results > 0):
-                mask = results < np.percentile(results, 10)
-            else:
-                mask = abs(results) < np.percentile(abs(results), 30)
+            # if all(results < 0):
+            #     mask = results > np.percentile(results, 90)
+            # elif all(results > 0):
+            #     mask = results < np.percentile(results, 10)
+            # else:
+            mask = abs(results) < np.percentile(abs(results), 20) #@todo needs to be tested
         else: 
-            mask = results > np.percentile(results, 90)
+            mask = results > np.percentile(results, 80)
 
-        parameter = np.array(parameter)
+        parameter = np.array(parameter)[mask]
         parameter_low_top = []
-        for i in range(len(self.param_names)):
-            parameter_low_top.append([np.min(parameter[mask][:,i]), np.max(parameter[mask][:,i])])
+        # for i in range(len(self.param_names)):
+        #     parameter_low_top.append([np.min(parameter[mask][:,i]), np.max(parameter[mask][:,i])])
         space = []       
         if type(self.space) == dict:
             space = {}
-        for i, j, values in zip(self.space, self.param_names, parameter_low_top):
-            if (type(self.space[i][0]) == int) & (type(self.space[i][1]) == int):
-                if type(values[0])==type(values[1]):
-                    values = [int(values[0]-values[1]/100), 
-                              int(values[1]+values[1]/100),self.space[i][2]]
-                space[i] = values
-            elif (type(self.space[i][0]) == float) & (type(self.space[i][1]) == float):
-                if type(values[0])==type(values[1]):
-                    values = [values[0]-values[1]/100, 
-                              values[1]+values[1]/100,self.space[i][2]]
-                space[i] = values
-        self.space = space
+        for name in self.param_names:
+            values = [j[name] for j in parameter]
+            value_types = np.array([type(i) for i in self.space[name]])
+            length = len(self.space[name]) if self.own_trial else self.space[name][2]
+            if all(value_types==int): # hyperparameter with int format
+                self.space[name] = np.linspace(np.min(values), np.max(values), length, dtype=int)
+            elif any(value_types==float): # hyperparameter with float format
+                self.space[name] = np.linspace(np.min(values), np.max(values), length, dtype=float)
         args, params = self.create_args()
         return args, params
     
     def select_best(self, parameter, results):
         if self.target == 'min':
             index = np.argmin(np.abs(results))
-            test = results[index] < self.results_best   
+            test = np.abs(results[index]) < np.abs(self.results_best)   
         elif self.target == 'max':
             index = np.argmax(np.abs(results))
             test = results[index] > self.results_best
             
-        try:
-            if any(test): # sometthing test is an 1D array, why.. dont know...
-                self.parameter_best = dict(zip(self.param_names, parameter[index]))
-                self.results_best = results[index]
-        except:
-            if test:
-                self.parameter_best = dict(zip(self.param_names, parameter[index]))
-                self.results_best = results[index]
+        if test: #might giv problems, sometthing test is an 1D array, why.. dont know...
+            self.parameter_best = parameter[index]
+            self.results_best = results[index]
 
-    def gridsearch(self):
+
+    def gridsearch(self, optimize: bool, order=True, X=None, y=None, target=None, niter=0) -> list:
+        """
+        Function performance the gridsearh. This can be done two main ways.
+
+        Parameters
+        ----------
+        optimize : bool
+            optimize=True, the algo will try to find the best parameter and return them
+            optimize=False, the algo will do a simple gridsearch through the parameters given
+        order : TYPE, optional
+            If the return order is important for the algo. The default is True.
+            order=False might be faster
+        X : TYPE, optional
+            If X values are needed for ML. The default is None.
+            IMPORTANT: the format need to support multiple readers
+        y : TYPE, optional
+            If y values are needed for ML. The default is None.
+            IMPORTANT: the format need to support multiple readers
+        target : TYPE, optional
+            Only used if optimize=True. The algo need to know to optimize or minimize. The default is None.
+        niter : TYPE, optional
+            How many times to rerun the gridsearc. The default is None.
+
+        Returns
+        -------
+        list
+            Returns a list of parameters and results.
+
+        """
+        self.optimize=optimize
+        self.niter = niter; self.order = order; self.X, self.y, self.target = X, y, target
+        if optimize:
+            assert (target in ['min', 'max']), 'One of the optimizing parameters is not set (X, y or target)'
+            self.target = target
+            if self.target == 'min':
+                self.results_best = 10**100
+            elif self.target == 'max':
+                self.results_best = 0.0
+        try:
+            assert any([type(i)==list for i in self.space.values()]), 'Input error: The grid space has to be list - See dokumentation'
+        except SyntaxError:
+            assert False, 'Input error: The grid space has to be list - See dokumentation'            
         start = time.time()
 
         # model_str_type = re.findall('[A-Z][^A-Z]*',str(self.model).split('(')[0])
         args, params = self.create_args()
-        parameter, results = self.parallelizing(args, params)
-        self.select_best(parameter, results)
-        self.bool_plotting(parameter, results)
-        for i in tqdm(range(self.niter)):
-            args, params = self.higher_quartile(parameter, results)
-            parameter, results = self.parallelizing(args, params)
+        disable=False if self.niter==0 else True
+        parameter, results = self.parallelizing(args, params, optimize, disable=disable)
+        if self.optimize:
             self.select_best(parameter, results)
-            self.bool_plotting(parameter, results)
-        
-        print(f'\nBest score: {self.results_best}')
-        print(f'Parameters: {self.parameter_best}')
-        print(f'Time it took: {time.time()-start}s')
+            for i in tqdm(range(self.niter)):
+                # print('best result:', np.min(np.abs(results)))
+                args, params = self.higher_quartile(parameter, results)
+                parameter, results = self.parallelizing(args, params, optimize, disable=disable)
+                self.select_best(parameter, results)
+                # self.bool_plotting(parameter, results)
+            if self.verbose:
+                print(f'\nBest score: {self.results_best}')
+                print(f'Parameters: {self.parameter_best}')
+                print(f'Time it took: {time.time()-start}s')
+                
         return parameter, results
     
     def find_gradient(self, parameter, results, number_for_mean = 10):
@@ -231,15 +246,19 @@ class paragrid():
                           f'{jump_out_of_loop} iterations')
                     break
                 
-        
-        print(f'\nBest score: {self.results_best}')
-        print(f'Parameters: {self.parameter_best}')
-        print(f'Time it took: {time.time()-start}s')
+        if self.verbose:
+            print(f'\nBest score: {self.results_best}')
+            print(f'Parameters: {self.parameter_best}')
+            print(f'Time it took: {time.time()-start}s')
         return parameter, results
     
     def score(self):
-        return self.parameter_best
-    
+        try:
+            print('Best score: ', self.results_best)
+            print('with parameters:', self.parameter_best)
+            return self.parameter_best
+        except AttributeError:
+            raise AttributeError('Optimize is set to False, so the optimal parameters have not been found')
     def plots_gradient(self, parameter, result, niter):
         z = []
         size = 12
